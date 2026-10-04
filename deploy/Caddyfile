@@ -1,0 +1,13 @@
+# {$DOMINIO} é substituído pela variável de ambiente do container.
+# O Caddy pede e renova o certificado Let's Encrypt sozinho — não existe
+# certbot, nem cron de renovação, nem bloco de TLS pra escrever.
+{$DOMINIO} {
+	# "app" é o nome do serviço no compose; o DNS interno do Docker resolve.
+	reverse_proxy app:8000
+
+	# Log em JSON no stdout, pra sair no `docker compose logs`.
+	log {
+		output stdout
+		format json
+	}
+}

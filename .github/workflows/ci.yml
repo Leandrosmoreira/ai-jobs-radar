@@ -68,3 +68,48 @@ jobs:
           echo "container nao respondeu no /health"
           docker logs radar
           exit 1
+
+  publicar:
+    runs-on: ubuntu-latest
+    # Só publica se os testes E o smoke test do container passaram.
+    needs: [test, docker]
+    # E só a partir da main: PR não publica imagem.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    permissions:
+      contents: read
+      # O GITHUB_TOKEN é read-only por padrão. Sem isto, o push no ghcr falha.
+      packages: write
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Login no GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # Token efêmero gerado pelo próprio Actions — nada de PAT aqui.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calcular tags da imagem
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # O GHCR exige nome todo minúsculo; esta action normaliza sozinha.
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+
+      - name: Build e push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Cache de camadas guardado no próprio GitHub entre execuções.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

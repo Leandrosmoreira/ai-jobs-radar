@@ -1,0 +1,37 @@
+# Deploy da VPS. Rodar daqui: docker compose up -d
+#
+# Dois serviços: a app (não exposta à internet) e o Caddy, que termina
+# TLS e faz proxy para ela.
+
+services:
+  app:
+    image: ghcr.io/leandrosmoreira/ai-jobs-radar:latest
+    restart: unless-stopped
+    # Repare: NÃO existe `ports:` aqui. A app não abre porta no host —
+    # só o Caddy a alcança, pela rede interna que o compose cria.
+    # Isso significa que nem IP:8000 funciona de fora. É de propósito.
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"      # 80 é obrigatório: o Let's Encrypt valida por ele
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+    environment:
+      # Falha com mensagem clara se o .env não tiver DOMINIO definido.
+      DOMINIO: ${DOMINIO:?defina DOMINIO no arquivo .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Volume nomeado guarda os certificados. Se você apagar isto, o Caddy
+      # pede certificado novo — e o Let's Encrypt tem rate limit semanal.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:
