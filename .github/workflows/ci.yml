@@ -118,3 +118,48 @@ jobs:
           # Cache de camadas guardado no próprio GitHub entre execuções.
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  notificar:
+    runs-on: ubuntu-latest
+    needs: [test, docker, publicar]
+    # always(): roda mesmo se algo antes falhou — é justamente quando mais
+    # importa avisar. Sem isto, um teste vermelho pularia este job.
+    if: always()
+
+    steps:
+      - name: Avisar no celular (ntfy)
+        env:
+          # O tópico do ntfy é público: quem souber o nome lê as mensagens.
+          # Por isso ele é um secret do repositório, nunca texto no YAML.
+          NTFY_TOPICO: ${{ secrets.NTFY_TOPICO }}
+          # needs.*.result = lista com o resultado de cada job anterior.
+          # "skipped" não conta como falha: em PR o publicar é pulado de propósito.
+          FALHOU: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+          # Valores do GitHub entram por env, não direto no script com ${{ }}:
+          # assim nenhum texto controlado por terceiros vira comando de shell.
+          LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          # PR de fork não recebe secrets; sem tópico, só não avisa.
+          if [ -z "$NTFY_TOPICO" ]; then
+            echo "NTFY_TOPICO não definido, pulando aviso"
+            exit 0
+          fi
+
+          if [ "$FALHOU" = "true" ]; then
+            TITULO="AI Jobs Radar: CI FALHOU"; TAGS="x"; PRIORIDADE=4
+          else
+            TITULO="AI Jobs Radar: CI passou"; TAGS="white_check_mark"; PRIORIDADE=3
+          fi
+
+          # Tags viram emoji no app; Click abre o run ao tocar na notificação.
+          # "|| echo": o ntfy fora do ar não deve pintar o CI de vermelho.
+          curl -fsS \
+            -H "Title: $TITULO" \
+            -H "Tags: $TAGS" \
+            -H "Priority: $PRIORIDADE" \
+            -H "Click: $LINK" \
+            -d "Branch $REF, commit ${SHA:0:7}" \
+            "https://ntfy.sh/$NTFY_TOPICO" \
+            || echo "falha ao enviar para o ntfy"
