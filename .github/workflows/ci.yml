@@ -40,3 +40,31 @@ jobs:
 
       - name: Rodar os testes
         run: pytest -v
+
+  docker:
+    runs-on: ubuntu-latest
+    # needs: só constrói imagem se os testes passaram. Não empacote código
+    # que você não sabe se funciona.
+    needs: test
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Build da imagem
+        run: docker build -t ai-jobs-radar:ci .
+
+      - name: Smoke test — subir o container e bater no /health
+        run: |
+          docker run -d --name radar -p 8000:8000 ai-jobs-radar:ci
+          # O container leva um instante pra subir o uvicorn; tenta por ~30s.
+          for i in $(seq 1 15); do
+            if curl -fsS http://127.0.0.1:8000/health; then
+              echo " <- respondeu"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "container nao respondeu no /health"
+          docker logs radar
+          exit 1

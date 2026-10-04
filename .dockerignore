@@ -1,0 +1,15 @@
+# Reduz o contexto enviado ao daemon e evita vazar coisa pra imagem.
+# Arquivo SEPARADO do .gitignore — o Docker não lê o .gitignore.
+.venv/
+.git/
+.github/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+tests/
+.env
+Dockerfile
+.dockerignore
