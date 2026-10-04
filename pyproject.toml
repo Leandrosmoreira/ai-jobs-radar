@@ -1,0 +1,29 @@
+[project]
+name = "ai-jobs-radar"                  # nome de distribuição: hífen
+version = "0.1.0"
+description = "Radar de vagas de AI Engineer: coleta vagas e extrai os requisitos pedidos pelo mercado."
+requires-python = ">=3.12"
+
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic>=2.9",
+    "uvicorn[standard]>=0.32",          # servidor ASGI — você vai precisar no passo 2
+]
+
+[project.optional-dependencies]
+# Só dev e CI instalam isto. Não entra na imagem Docker de produção.
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.27",                      # exigido pelo TestClient do FastAPI — passo 4
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_jobs_radar"]        # pacote importável: underscore
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]                   # pytest não sai varrendo .venv/
+addopts = "-q"                          # saída curta; use -v na mão quando quiser
