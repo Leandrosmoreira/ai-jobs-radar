@@ -5,9 +5,10 @@
 # deploy/nginx-radar.conf. O compose.yaml com Caddy continua valendo para uma
 # VPS dedicada ao radar.
 #
-# Rodar na VPS, como usuário deploy, em ~/ai-jobs-radar:
-#   docker compose -f compose.vps.yaml pull
-#   docker compose -f compose.vps.yaml up -d
+# Rodar na VPS, como usuário uso (via sudo: uso não está no grupo docker),
+# em ~/ai-jobs-radar:
+#   sudo docker compose -f compose.vps.yaml pull
+#   sudo docker compose -f compose.vps.yaml up -d
 
 services:
   app:
