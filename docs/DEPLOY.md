@@ -10,6 +10,12 @@ push na main → Actions (test → docker → publicar) → ghcr.io
                                                VPS: Caddy (443) → app (8000)
 ```
 
+Há dois caminhos:
+
+- **VPS dedicada ao radar** → seções 1 a 7 abaixo (Caddy no compose).
+- **VPS compartilhada (Contabo, o caminho em uso hoje)** → seção
+  [VPS compartilhada com nginx](#vps-compartilhada-com-nginx-contabo), no fim.
+
 ---
 
 ## Pré-requisito: DNS
@@ -80,10 +86,16 @@ Não use um token com permissão de escrita num servidor.
 echo "COLE_O_TOKEN_AQUI" | docker login ghcr.io -u Leandrosmoreira --password-stdin
 ```
 
-> Alternativa: tornar o *package* público em
-> `github.com/users/Leandrosmoreira/packages/container/ai-jobs-radar/settings`.
-> Aí a VPS puxa sem autenticação nenhuma, e o repo de código continua
-> privado. Mais simples, mas a imagem fica aberta.
+> **Estado atual: o package é público** (decidido em 06/10/2026), então este
+> passo não é mais necessário — a VPS puxa sem autenticação e o repo de
+> código continua privado. Para mudar: logado como `Leandrosmoreira`, abra
+> `github.com/users/Leandrosmoreira/packages/container/package/ai-jobs-radar`
+> → *Package settings → Danger Zone → Change visibility*.
+>
+> Por que público: é projeto de portfólio, e assim não fica token guardado
+> na VPS (o `read:packages` classic lê **todos** os seus pacotes) nem token
+> para renovar. A regra que isso impõe: **nenhum segredo dentro da imagem** —
+> chaves de API entram por variável de ambiente no compose, via `.env` na VPS.
 
 ---
 
@@ -148,6 +160,82 @@ curl --max-time 5 http://IP_DA_VPS:8000/health
 cd ~/ai-jobs-radar
 docker compose pull && docker compose up -d
 docker image prune -f     # remove as imagens antigas órfãs
+```
+
+---
+
+## VPS compartilhada com nginx (Contabo)
+
+É o deploy em uso hoje: **https://radar.13-140-42-86.sslip.io/health**.
+
+Na Contabo (`13.140.42.86`) o nginx já ocupa as portas 80/443 atendendo o
+painel do uso e o yldlab-mcp, então o Caddy do compose não pode subir ali.
+Em vez dele:
+
+```
+internet → nginx (443, TLS do certbot) → 127.0.0.1:8083 → container (8000)
+```
+
+Arquivos: [`deploy/compose.vps.yaml`](../deploy/compose.vps.yaml) (só a app,
+sem Caddy) e [`deploy/nginx-radar.conf`](../deploy/nginx-radar.conf) (o
+site). O domínio é do [sslip.io](https://sslip.io): `radar.13-140-42-86.sslip.io`
+resolve sozinho para o IP, sem comprar domínio nem configurar DNS.
+
+Portas já usadas na VPS: 8000 (yldlab-mcp), 8081/8082 (iracingeng), 8090
+(mapa). O radar usa a **8083**, publicada só em `127.0.0.1` — sem isso o
+Docker abriria a porta para a internet passando por cima do `ufw`.
+
+### Usuário e permissões
+
+- Entra-se como `uso` (`ssh contabo`, chave `id_ed25519_contabo`). Não existe
+  usuário `deploy`.
+- O `uso` foi criado **sem senha** (`adduser --disabled-password`). Para o
+  `sudo` funcionar foi preciso definir uma, como root, pelo console VNC da
+  Contabo — o SSH do root só aceita chave (`PasswordAuthentication no`).
+- O `uso` está no grupo `docker` (`usermod -aG docker uso`), então
+  `docker compose` roda sem `sudo`. Atenção: grupo `docker` equivale a root.
+- nginx e certbot continuam exigindo `sudo`.
+
+### Primeira instalação
+
+Da sua máquina:
+
+```bash
+ssh contabo 'mkdir -p ~/ai-jobs-radar'
+scp deploy/compose.vps.yaml deploy/nginx-radar.conf contabo:~/ai-jobs-radar/
+```
+
+Na VPS (`ssh -t contabo`):
+
+```bash
+cd ~/ai-jobs-radar
+docker compose -f compose.vps.yaml pull
+docker compose -f compose.vps.yaml up -d
+curl -fsS http://127.0.0.1:8083/health      # {"status":"ok"}
+
+sudo cp nginx-radar.conf /etc/nginx/sites-available/ai-jobs-radar
+sudo ln -s /etc/nginx/sites-available/ai-jobs-radar /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d radar.13-140-42-86.sslip.io   # aceite o redirect p/ HTTPS
+```
+
+O certbot **edita** o arquivo em `/etc/nginx/sites-enabled/` (bloco 443 +
+redirect). Por isso a cópia do repositório não tem HTTPS — não sobrescreva o
+arquivo da VPS com ela sem rodar o certbot de novo. A renovação é automática
+(timer do systemd); o certificado atual vence em 04/01/2027.
+
+### Atualizar depois de um push
+
+```bash
+ssh contabo 'cd ~/ai-jobs-radar && docker compose -f compose.vps.yaml pull && docker compose -f compose.vps.yaml up -d && docker image prune -f'
+```
+
+### Verificar
+
+```bash
+curl -i https://radar.13-140-42-86.sslip.io/health    # 200, {"status":"ok"}
+curl -I http://radar.13-140-42-86.sslip.io/health     # 301 → https
+curl --max-time 5 http://13.140.42.86:8083/health     # deve dar timeout
 ```
 
 ---
