@@ -1,0 +1,22 @@
+# Deploy na VPS compartilhada (Contabo), onde o nginx já é o porteiro das
+# portas 80/443 — atende o painel do uso e o yldlab-mcp.
+#
+# Por isso aqui NÃO tem Caddy: o nginx faz o papel dele (proxy + TLS), ver
+# deploy/nginx-radar.conf. O compose.yaml com Caddy continua valendo para uma
+# VPS dedicada ao radar.
+#
+# Rodar na VPS, como usuário deploy, em ~/ai-jobs-radar:
+#   docker compose -f compose.vps.yaml pull
+#   docker compose -f compose.vps.yaml up -d
+
+services:
+  app:
+    image: ghcr.io/leandrosmoreira/ai-jobs-radar:latest
+    container_name: ai-jobs-radar
+    restart: unless-stopped
+    ports:
+      # 127.0.0.1 na frente: a porta só existe DENTRO da VPS. Sem isso, o
+      # Docker abriria 8083 para a internet inteira, passando por cima do
+      # firewall (ufw) — pegadinha clássica do Docker.
+      # 8081/8082 são do iracingeng, 8000 do yldlab-mcp, 8090 do mapa.
+      - "127.0.0.1:8083:8000"
