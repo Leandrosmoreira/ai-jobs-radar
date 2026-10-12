@@ -90,11 +90,14 @@ Runs on a shared VPS behind nginx with a Let's Encrypt certificate; the containe
 
 | Step | What | Status |
 |---|---|---|
-| 1 | Package, API, `Vaga` model, tests, Docker, CI, deploy | ✅ done |
+| 1 | Package, API, `Vaga` model, async Greenhouse collector, tests, Docker, CI, deploy | ✅ done |
 | 2 | **Extractor**: an LLM reads a job description and returns stack, seniority and type as JSON validated by `Vaga` | next |
 | 3 | **MCP server**: collection (Greenhouse, Lever, Ashby) and extraction exposed as MCP tools | planned |
 | 4 | **RAG**: jobs as embeddings in pgvector, hybrid search and re-ranking | planned |
 | 5 | **Agent** (LangGraph) using the MCP tools and RAG, with guardrails and evals | planned |
+| 6 | **Evals & observability**: LLM-as-a-judge on the RAG, Langfuse and Promptfoo, evals in CI that block a deploy if quality drops | planned |
+| 7 | **LLMOps**: behind a LiteLLM gateway with fallback, cache and cost per project | planned |
+| 8 | **Showcase**: weekly AI job-market trends, real users and usage metrics | planned |
 
 ## License
 
